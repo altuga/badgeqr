@@ -1,0 +1,1 @@
+web: java -Xmx750m -Xms500m -XX:+UseCompressedOops -XX:+UseStringDeduplication -jar target/*.jar 
