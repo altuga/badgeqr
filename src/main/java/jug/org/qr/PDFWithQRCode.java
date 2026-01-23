@@ -52,9 +52,11 @@ public class PDFWithQRCode {
             PdfWriter.getInstance(document, new FileOutputStream(outputPdfPath));
             document.open();
 
-            for (Attendee attendee : attendees) {
-                addBadgeToDocument(document, attendee);
-                document.newPage(); // New page after each badge
+            for (int i = 0; i < attendees.size(); i++) {
+                addBadgeToDocument(document, attendees.get(i));
+                if (i < attendees.size() - 1) {
+                    document.newPage(); // New page between badges
+                }
             }
 
             document.close();

@@ -1,0 +1,18 @@
+.git
+.gitignore
+.idea
+*.iml
+.DS_Store
+
+# Maven / build outputs
+/target
+**/target
+
+# Local tooling
+.vscode
+
+# Logs
+*.log
+
+# Node (if ever added)
+node_modules

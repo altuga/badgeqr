@@ -1,9 +1,6 @@
 package jug.org.qr;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -85,19 +82,62 @@ public class BadgeController {
         }
     }
 
+    @PostMapping("/quick-generate-label")
+    public String quickGenerateLabel(
+            @RequestParam("name") String name,
+            @RequestParam("email") String email,
+            @RequestParam("company") String company,
+            RedirectAttributes redirectAttributes) {
+        try {
+            Attendee attendee = new Attendee(name, "", email, company);
+            byte[] pdfBytes = badgeService.generateSingleLabel80x50(attendee);
+            String fileId = UUID.randomUUID().toString();
+            pdfCache.put(fileId, pdfBytes);
+
+            redirectAttributes.addFlashAttribute("success", "Label generated successfully!");
+            return "redirect:/download?fileId=" + fileId + "&filename=label_80x50.pdf";
+        } catch (Exception e) {
+            redirectAttributes.addFlashAttribute("error", "Error: " + e.getMessage());
+            return "redirect:/";
+        }
+    }
+
+    @PostMapping("/generate-labels")
+    public String generateLabels(@RequestParam("file") MultipartFile file,
+                                 RedirectAttributes redirectAttributes) {
+        try {
+            byte[] pdfBytes = badgeService.generateLabels80x50(file);
+            String fileId = UUID.randomUUID().toString();
+            pdfCache.put(fileId, pdfBytes);
+
+            redirectAttributes.addFlashAttribute("success", "Labels generated successfully!");
+            return "redirect:/download?fileId=" + fileId + "&filename=labels_80x50.pdf";
+        } catch (Exception e) {
+            if (e.getMessage() != null && e.getMessage().contains("No valid attendees found")) {
+                redirectAttributes.addFlashAttribute("error", "No valid rows found in CSV. Please check your file format.");
+            } else {
+                redirectAttributes.addFlashAttribute("error", "Error: " + e.getMessage());
+            }
+            return "redirect:/";
+        }
+    }
+
     @GetMapping("/download")
     public void download(
             @RequestParam("fileId") String fileId,
+            @RequestParam(value = "filename", required = false) String filename,
             HttpServletResponse response) throws IOException {
         byte[] pdfBytes = pdfCache.remove(fileId);
         if (pdfBytes == null) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
+
+        String safeFilename = sanitizeFilename(filename, "badges.pdf");
         
         // Set response headers
         response.setContentType("application/pdf");
-        response.setHeader("Content-Disposition", "attachment; filename=badges.pdf");
+        response.setHeader("Content-Disposition", "attachment; filename=" + safeFilename);
         response.setContentLength(pdfBytes.length);
         response.setHeader("Cache-Control", "no-cache, no-store, must-revalidate");
         response.setHeader("Pragma", "no-cache");
@@ -108,5 +148,21 @@ public class BadgeController {
             out.write(pdfBytes);
             out.flush();
         }
+    }
+
+    private static String sanitizeFilename(String filename, String defaultName) {
+        if (filename == null) {
+            return defaultName;
+        }
+        String trimmed = filename.trim();
+        if (trimmed.isEmpty()) {
+            return defaultName;
+        }
+        // Prevent header injection and keep it filesystem-safe.
+        String cleaned = trimmed.replaceAll("[^a-zA-Z0-9._-]", "_");
+        if (cleaned.length() > 120) {
+            cleaned = cleaned.substring(0, 120);
+        }
+        return cleaned;
     }
 } 

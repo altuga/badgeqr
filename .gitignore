@@ -1,0 +1,16 @@
+.DS_Store
+
+# IntelliJ
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Maven / Java build
+/target/
+**/target/
+*.class
+
+# Logs
+*.log

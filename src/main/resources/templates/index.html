@@ -121,8 +121,8 @@
             <div class="spinner-border text-primary spinner" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
-            <h4 class="mt-3">Processing your file...</h4>
-            <p>Please wait while we generate your badges.</p>
+            <h4 class="mt-3">Processing...</h4>
+            <p>Please wait while we generate your PDF.</p>
             <p class="text-muted">This may take a few moments for large files.</p>
         </div>
     </div>
@@ -155,7 +155,8 @@
                     <label for="company">Company</label>
                     <input type="text" id="company" name="company">
                 </div>
-                <button type="submit" class="btn btn-primary">Generate Single Badge</button>
+                <button type="submit" class="btn btn-primary" formaction="/quick-generate">Generate Single Badge (80x80)</button>
+                <button type="submit" class="btn btn-success ms-2" formaction="/quick-generate-label">Generate Label (80x50)</button>
             </form>
 
             <div class="divider">
@@ -170,7 +171,8 @@
                     <label for="file">CSV File *</label>
                     <input type="file" id="file" name="file" accept=".csv" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Generate Badges</button>
+                <button type="submit" class="btn btn-primary" formaction="/generate">Generate Badges (80x80)</button>
+                <button type="submit" class="btn btn-success ms-2" formaction="/generate-labels">Generate Labels (80x50)</button>
             </form>
             
             <div class="mt-4">
@@ -188,28 +190,32 @@
             const loadingOverlay = document.getElementById("loadingOverlay");
             const forms = document.querySelectorAll("form");
 
-            // Function to reset button state
-            function resetButton(button, originalText) {
-                button.disabled = false;
-                button.textContent = originalText;
-            }
+            // Remember original button texts
+            document.querySelectorAll('button[type="submit"]').forEach(btn => {
+                btn.dataset.originalText = btn.textContent;
+            });
 
             // Show overlay on form submission
             forms.forEach(form => {
-                const submitButton = form.querySelector('button[type="submit"]');
-                const originalText = submitButton.textContent;
-
                 form.addEventListener("submit", function (e) {
+                    const submitButton = e.submitter || document.activeElement;
+                    const originalText = submitButton && submitButton.dataset ? submitButton.dataset.originalText : null;
+
                     // Show the overlay
                     loadingOverlay.style.display = "flex";
                     
                     // Disable the submit button and change text
-                    submitButton.disabled = true;
-                    submitButton.textContent = "Processing...";
+                    if (submitButton) {
+                        submitButton.disabled = true;
+                        submitButton.textContent = "Processing...";
+                    }
 
                     // Add a one-time beforeunload listener
                     const unloadHandler = function() {
-                        resetButton(submitButton, originalText);
+                        if (submitButton && originalText != null) {
+                            submitButton.disabled = false;
+                            submitButton.textContent = originalText;
+                        }
                         window.removeEventListener('beforeunload', unloadHandler);
                     };
                     window.addEventListener('beforeunload', unloadHandler);
@@ -224,13 +230,6 @@
             // Hide overlay if we're on the download page
             if (window.location.pathname === '/download') {
                 loadingOverlay.style.display = "none";
-                // Reset all buttons on download page
-                forms.forEach(form => {
-                    const submitButton = form.querySelector('button[type="submit"]');
-                    if (submitButton) {
-                        resetButton(submitButton, submitButton.textContent);
-                    }
-                });
             }
         });
     </script>
