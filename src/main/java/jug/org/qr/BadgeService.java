@@ -39,6 +39,9 @@ public class BadgeService {
     private static final float LABEL_HEIGHT_MM = 50f;
     private static final float LABEL_MARGIN_PT = 6f;
 
+    // Nudge the whole 80x50 label content slightly downward (in mm).
+    private static final float LABEL_TOP_SHIFT_MM = 3f;
+
     private File tempFontFile;
     private Font nameFont;
     private Font companyFont;
@@ -314,10 +317,17 @@ public class BadgeService {
         float mmToPoints = 72f / 25.4f;
         // Keep the fixed title but remove the dark band for B/W printing.
         float headerHeight = 6f * mmToPoints;
-        float bodyHeight = Math.max(0f, contentHeight - headerHeight);
+        float topSpacerHeight = LABEL_TOP_SHIFT_MM * mmToPoints;
+        float bodyHeight = Math.max(0f, contentHeight - headerHeight - topSpacerHeight);
 
         PdfPTable root = new PdfPTable(1);
         root.setWidthPercentage(100);
+
+        PdfPCell topSpacer = new PdfPCell(new Phrase(""));
+        topSpacer.setBorder(Rectangle.NO_BORDER);
+        topSpacer.setFixedHeight(topSpacerHeight);
+        topSpacer.setPadding(0f);
+        root.addCell(topSpacer);
 
         PdfPCell headerCell = new PdfPCell(new Phrase(LABEL_EVENT_TITLE, headerFont));
         headerCell.setBorder(Rectangle.NO_BORDER);
