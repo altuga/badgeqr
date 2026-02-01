@@ -65,11 +65,13 @@ public class BadgeController {
     @PostMapping("/quick-generate")
     public String quickGenerateBadge(
             @RequestParam("name") String name,
-            @RequestParam("email") String email,
+            @RequestParam(value = "linkedin", required = false) String linkedin,
+            @RequestParam(value = "email", required = false) String email,
             @RequestParam("company") String company,
             RedirectAttributes redirectAttributes) {
         try {
-            Attendee attendee = new Attendee(name, "", email, company);
+            String contact = (linkedin != null && !linkedin.trim().isEmpty()) ? linkedin : email;
+            Attendee attendee = new Attendee(name, "", contact, company);
             byte[] pdfBytes = badgeService.generateSingleBadge(attendee);
             String fileId = UUID.randomUUID().toString();
             pdfCache.put(fileId, pdfBytes);
@@ -85,11 +87,13 @@ public class BadgeController {
     @PostMapping("/quick-generate-label")
     public String quickGenerateLabel(
             @RequestParam("name") String name,
-            @RequestParam("email") String email,
+            @RequestParam(value = "linkedin", required = false) String linkedin,
+            @RequestParam(value = "email", required = false) String email,
             @RequestParam("company") String company,
             RedirectAttributes redirectAttributes) {
         try {
-            Attendee attendee = new Attendee(name, "", email, company);
+            String contact = (linkedin != null && !linkedin.trim().isEmpty()) ? linkedin : email;
+            Attendee attendee = new Attendee(name, "", contact, company);
             byte[] pdfBytes = badgeService.generateSingleLabel80x50(attendee);
             String fileId = UUID.randomUUID().toString();
             pdfCache.put(fileId, pdfBytes);

@@ -26,7 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class BadgeService {
 
-    private static final String LABEL_EVENT_TITLE = "JUG Tech Day #5";
+    private static final String LABEL_EVENT_TITLE = "JUG TECH DAY #5";
 
     private static final float BADGE_WIDTH = 80f * 2.8346457f; // 80mm in points
     private static final float BADGE_HEIGHT = 80f * 2.8346457f; // 80mm in points
@@ -166,11 +166,11 @@ public class BadgeService {
 
                 if (columns.length >= 3) {
                     String fullName = columns[0] != null ? columns[0].trim() : "";
-                    String email = columns[1] != null ? columns[1].trim() : "";
+                    String linkedin = columns[1] != null ? columns[1].trim() : "";
                     String company = columns[2] != null ? columns[2].trim() : "";
 
                     // Skip rows with missing required fields
-                    if (fullName.isEmpty() || email.isEmpty()) {
+                    if (fullName.isEmpty() || linkedin.isEmpty()) {
                         skippedRows++;
                         continue;
                     }
@@ -179,7 +179,7 @@ public class BadgeService {
                     String name = nameParts.length > 0 ? nameParts[0] : "";
                     String surname = nameParts.length > 1 ? nameParts[1] : "";
                     
-                    attendees.add(new Attendee(name, surname, email, company));
+                    attendees.add(new Attendee(name, surname, linkedin, company));
                     validRows++;
                 } else {
                     skippedRows++;
@@ -248,8 +248,8 @@ public class BadgeService {
         companyCell.setPaddingBottom(2f);
         companyCell.setNoWrap(false);
 
-        String vCardData = generateVCard(attendee);
-        Image qrImage = generateQRCodeImage(vCardData);
+        String qrPayload = LinkedInNormalizer.normalizeToQrPayload(attendee.getLinkedin());
+        Image qrImage = generateQRCodeImage(qrPayload);
         float qrTarget = Math.min(contentWidth, contentHeight * 0.62f);
         qrImage.scaleToFit(qrTarget, qrTarget);
 
@@ -374,7 +374,8 @@ public class BadgeService {
         float rightWidth = contentWidth * 0.38f;
         float qrTarget = Math.min(rightWidth, bodyHeight);
 
-        Image qrImage = generateQRCodeImage(attendee.getEmail() == null ? "" : attendee.getEmail().trim());
+        String qrPayload = LinkedInNormalizer.normalizeToQrPayload(attendee.getLinkedin());
+        Image qrImage = generateQRCodeImage(qrPayload);
         qrImage.scaleToFit(qrTarget, qrTarget);
 
         PdfPCell qrCell = new PdfPCell(qrImage, true);
@@ -408,7 +409,7 @@ public class BadgeService {
                 "N:" + attendee.getSurname() + ";" + attendee.getName() + ";;;\n" +
                 "FN:" + attendee.getNameSurname() + "\n" +
                 "ORG:" + attendee.getCompany() + "\n" +
-                "EMAIL:" + attendee.getEmail() + "\n" +
+                "EMAIL:" + attendee.getLinkedin() + "\n" +
                 "END:VCARD";
     }
 
@@ -435,8 +436,8 @@ public class BadgeService {
         if (attendee.getName() == null || attendee.getName().trim().isEmpty()) {
             throw new IllegalArgumentException("Name is required");
         }
-        if (attendee.getEmail() == null || attendee.getEmail().trim().isEmpty()) {
-            throw new IllegalArgumentException("Email is required");
+        if (LinkedInNormalizer.normalizeToQrPayload(attendee.getLinkedin()).isEmpty()) {
+            throw new IllegalArgumentException("LinkedIn (or Email) is required");
         }
 
         // 80mm x 80mm page size setup
@@ -471,8 +472,8 @@ public class BadgeService {
         if (attendee.getName() == null || attendee.getName().trim().isEmpty()) {
             throw new IllegalArgumentException("Name is required");
         }
-        if (attendee.getEmail() == null || attendee.getEmail().trim().isEmpty()) {
-            throw new IllegalArgumentException("Email is required");
+        if (LinkedInNormalizer.normalizeToQrPayload(attendee.getLinkedin()).isEmpty()) {
+            throw new IllegalArgumentException("LinkedIn (or Email) is required");
         }
 
         float mmToPoints = 72f / 25.4f;

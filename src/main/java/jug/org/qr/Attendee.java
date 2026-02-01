@@ -4,19 +4,21 @@ public class Attendee {
     private final String name;
     private final String surname;
     private final String company;
-    private final String email;
+    private final String linkedin;
 
-    public Attendee(String name, String surname, String email, String company) {
+    public Attendee(String name, String surname, String linkedin, String company) {
         this.name = name;
         this.surname = surname;
         this.company = company;
-        this.email = email;
+        this.linkedin = linkedin;
     }
 
     public String getName() { return name; }
     public String getSurname() { return surname; }
     public String getCompany() { return company; }
-    public String getEmail() { return email; }
+
+    public String getLinkedin() { return linkedin; }
+    public String getEmail() { return linkedin; }
 
     public String getNameSurname() { return name + " " + surname; }
 }

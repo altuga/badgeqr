@@ -28,15 +28,15 @@ public class AttendeeService {
 
                 if (columns.length >= 3) {
                     String fullName = columns[0].trim();   // Ad Soyad
-                    String email = columns[1].trim();      // E-posta adresi
+                    String linkedin = columns[1].trim();      // LinkedIn handle/URL
                     String company = columns[2].trim();    // Şirket
 
                     // Split full name into name and surname (best effort)
                     String[] nameParts = fullName.split(" ", 2);
                     String name = nameParts.length > 0 ? nameParts[0] : "";
                     String surname = nameParts.length > 1 ? nameParts[1] : "";
-                    System.out.println("Name: " + fullName + ", Email: " + email + ", Company: " + company);
-                    attendees.add(new Attendee(name, surname, email, company));
+                    System.out.println("Name: " + fullName + ", LinkedIn: " + linkedin + ", Company: " + company);
+                    attendees.add(new Attendee(name, surname, linkedin, company));
                 }
             }
         }

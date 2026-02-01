@@ -110,8 +110,8 @@ public class PDFWithQRCode {
         document.add(companyParagraph);
 
         // Generate QR Code
-        String vCardData = generateVCard(attendee);
-        Image qrImage = generateQRCodeImage(vCardData);
+        String qrPayload = LinkedInNormalizer.normalizeToQrPayload(attendee.getLinkedin());
+        Image qrImage = generateQRCodeImage(qrPayload);
 
         // Scale QR code to 100px for better fit
         int qrPixelSize = 150; // Reduced for better fit
@@ -121,17 +121,6 @@ public class PDFWithQRCode {
 
         // Ensure no additional space is added to the page
         document.add(new Paragraph("")); // Empty space to balance layout
-    }
-
-    // Create vCard content
-    public static String generateVCard(Attendee attendee) {
-        return "BEGIN:VCARD\n" +
-                "VERSION:3.0\n" +
-                "N:" + attendee.getSurname() + ";" + attendee.getName() + ";;;\n" +
-                "FN:" + attendee.getNameSurname() + "\n" +
-                "ORG:" + attendee.getCompany() + "\n" +
-                "EMAIL:" + attendee.getEmail() + "\n" +
-                "END:VCARD";
     }
 
     // Generate QR code image
