@@ -312,10 +312,9 @@ public class BadgeService {
         float contentHeight = document.getPageSize().getHeight() - document.topMargin() - document.bottomMargin();
         float contentWidth = document.getPageSize().getWidth() - document.leftMargin() - document.rightMargin();
 
-        // Title: keep it big, but ensure it fits on a single line (no wrapping like "JUG TECH\nDAY #5").
-        final float headerInnerWidthPct = 92f;
-        float headerFontSize = 30f;
-        float titleAvailableWidth = (contentWidth * 0.62f) * (headerInnerWidthPct / 100f) - 8f; // 4pt left + 4pt right
+        // Title: keep it big and centered, but ensure it fits on a single line (no wrapping like "JUG TECH\nDAY #5").
+        float headerFontSize = 36f;
+        float titleAvailableWidth = contentWidth - 12f; // allow some padding
         if (titleAvailableWidth > 0f) {
             float titleWidthAtSize = baseFont.getWidthPoint(LABEL_EVENT_TITLE, headerFontSize);
             if (titleWidthAtSize > titleAvailableWidth && titleWidthAtSize > 0f) {
@@ -328,7 +327,7 @@ public class BadgeService {
         float mmToPoints = 72f / 25.4f;
         // Keep the fixed title but remove the dark band for B/W printing.
         // Give the title extra vertical room to avoid clipping at larger font sizes.
-        float headerHeight = 12f * mmToPoints;
+        float headerHeight = 13f * mmToPoints;
         float topSpacerHeight = LABEL_TOP_SHIFT_MM * mmToPoints;
         float bodyHeight = Math.max(0f, contentHeight - headerHeight - topSpacerHeight);
 
@@ -341,41 +340,21 @@ public class BadgeService {
         topSpacer.setPadding(0f);
         root.addCell(topSpacer);
 
-        // Header: align title left on the same vertical line as the name text block.
-        PdfPTable header = new PdfPTable(2);
+        // Header: title spans full width and is centered.
+        PdfPTable header = new PdfPTable(1);
         header.setWidthPercentage(100);
-        header.setWidths(new float[]{62f, 38f});
-
-        PdfPCell headerLeft = new PdfPCell();
-        headerLeft.setBorder(Rectangle.NO_BORDER);
-        headerLeft.setPadding(0f);
-        headerLeft.setFixedHeight(headerHeight);
-        headerLeft.setVerticalAlignment(Element.ALIGN_MIDDLE);
-
-        PdfPTable headerLeftInner = new PdfPTable(1);
-        headerLeftInner.setWidthPercentage(headerInnerWidthPct);
-        headerLeftInner.setHorizontalAlignment(Element.ALIGN_CENTER);
 
         PdfPCell titleCell = new PdfPCell(new Phrase(LABEL_EVENT_TITLE, headerFont));
         titleCell.setBorder(Rectangle.NO_BORDER);
-        titleCell.setHorizontalAlignment(Element.ALIGN_LEFT);
+        titleCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         titleCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
         titleCell.setFixedHeight(headerHeight);
-        titleCell.setPaddingLeft(4f);
-        titleCell.setPaddingRight(4f);
+        titleCell.setPaddingLeft(6f);
+        titleCell.setPaddingRight(6f);
         titleCell.setPaddingTop(0f);
         titleCell.setPaddingBottom(0f);
         titleCell.setNoWrap(true);
-        headerLeftInner.addCell(titleCell);
-        headerLeft.addElement(headerLeftInner);
-
-        PdfPCell headerRight = new PdfPCell(new Phrase(""));
-        headerRight.setBorder(Rectangle.NO_BORDER);
-        headerRight.setPadding(0f);
-        headerRight.setFixedHeight(headerHeight);
-
-        header.addCell(headerLeft);
-        header.addCell(headerRight);
+        header.addCell(titleCell);
 
         PdfPCell headerWrap = new PdfPCell(header);
         headerWrap.setBorder(Rectangle.NO_BORDER);
