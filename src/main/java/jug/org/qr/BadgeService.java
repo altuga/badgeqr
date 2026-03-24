@@ -26,7 +26,10 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class BadgeService {
 
-    private static final String LABEL_EVENT_TITLE = "JUG TECH DAY #5";
+    //private static final String LABEL_EVENT_TITLE = "JUG TECH DAY #5";
+
+    private static final String LABEL_EVENT_TITLE = "Java Day Istanbul 2026";
+
 
     private static final float BADGE_WIDTH = 80f * 2.8346457f; // 80mm in points
     private static final float BADGE_HEIGHT = 80f * 2.8346457f; // 80mm in points
