@@ -27,8 +27,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class BadgeService {
 
     //private static final String LABEL_EVENT_TITLE = "JUG TECH DAY #5";
-
-    private static final String LABEL_EVENT_TITLE = "Java Day Istanbul 2026";
+    //private static final String LABEL_EVENT_TITLE = "Java Day Istanbul 2026";
 
 
     private static final float BADGE_WIDTH = 80f * 2.8346457f; // 80mm in points
@@ -254,7 +253,7 @@ public class BadgeService {
         companyCell.setPaddingBottom(2f);
         companyCell.setNoWrap(false);
 
-        String qrPayload = LinkedInNormalizer.normalizeToQrPayload(attendee.getLinkedin());
+        String qrPayload = generateVCard(attendee);
         Image qrImage = generateQRCodeImage(qrPayload);
         float qrTarget = Math.min(contentWidth, contentHeight * 0.62f);
         qrImage.scaleToFit(qrTarget, qrTarget);
@@ -315,24 +314,10 @@ public class BadgeService {
         float contentHeight = document.getPageSize().getHeight() - document.topMargin() - document.bottomMargin();
         float contentWidth = document.getPageSize().getWidth() - document.leftMargin() - document.rightMargin();
 
-        // Title: keep it big and centered, but ensure it fits on a single line (no wrapping like "JUG TECH\nDAY #5").
-        float headerFontSize = 36f;
-        float titleAvailableWidth = contentWidth - 12f; // allow some padding
-        if (titleAvailableWidth > 0f) {
-            float titleWidthAtSize = baseFont.getWidthPoint(LABEL_EVENT_TITLE, headerFontSize);
-            if (titleWidthAtSize > titleAvailableWidth && titleWidthAtSize > 0f) {
-                headerFontSize = headerFontSize * (titleAvailableWidth / titleWidthAtSize);
-            }
-        }
-        headerFontSize = Math.max(12f, headerFontSize);
-        Font headerFont = new Font(baseFont, headerFontSize, Font.BOLD, BaseColor.BLACK);
-
         float mmToPoints = 72f / 25.4f;
-        // Keep the fixed title but remove the dark band for B/W printing.
-        // Give the title extra vertical room to avoid clipping at larger font sizes.
-        float headerHeight = 13f * mmToPoints;
         float topSpacerHeight = LABEL_TOP_SHIFT_MM * mmToPoints;
-        float bodyHeight = Math.max(0f, contentHeight - headerHeight - topSpacerHeight);
+        // No header - use all available space for content (name, company, QR code)
+        float bodyHeight = Math.max(0f, contentHeight - topSpacerHeight);
 
         PdfPTable root = new PdfPTable(1);
         root.setWidthPercentage(100);
@@ -343,28 +328,7 @@ public class BadgeService {
         topSpacer.setPadding(0f);
         root.addCell(topSpacer);
 
-        // Header: title spans full width and is centered.
-        PdfPTable header = new PdfPTable(1);
-        header.setWidthPercentage(100);
-
-        PdfPCell titleCell = new PdfPCell(new Phrase(LABEL_EVENT_TITLE, headerFont));
-        titleCell.setBorder(Rectangle.NO_BORDER);
-        titleCell.setHorizontalAlignment(Element.ALIGN_CENTER);
-        titleCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        titleCell.setFixedHeight(headerHeight);
-        titleCell.setPaddingLeft(6f);
-        titleCell.setPaddingRight(6f);
-        titleCell.setPaddingTop(0f);
-        titleCell.setPaddingBottom(0f);
-        titleCell.setNoWrap(true);
-        header.addCell(titleCell);
-
-        PdfPCell headerWrap = new PdfPCell(header);
-        headerWrap.setBorder(Rectangle.NO_BORDER);
-        headerWrap.setPadding(0f);
-        headerWrap.setFixedHeight(headerHeight);
-        root.addCell(headerWrap);
-
+        // Body: name + company on left, QR code on right (no header)
         PdfPTable body = new PdfPTable(2);
         body.setWidthPercentage(100);
         body.setWidths(new float[]{62f, 38f});
@@ -413,7 +377,7 @@ public class BadgeService {
         float rightWidth = contentWidth * 0.38f;
         float qrTarget = Math.min(rightWidth, bodyHeight);
 
-        String qrPayload = LinkedInNormalizer.normalizeToQrPayload(attendee.getLinkedin());
+        String qrPayload = generateVCard(attendee);
         Image qrImage = generateQRCodeImage(qrPayload);
         qrImage.scaleToFit(qrTarget, qrTarget);
 
@@ -443,13 +407,31 @@ public class BadgeService {
     }
 
     private String generateVCard(Attendee attendee) {
-        return "BEGIN:VCARD\n" +
-                "VERSION:3.0\n" +
-                "N:" + attendee.getSurname() + ";" + attendee.getName() + ";;;\n" +
-                "FN:" + attendee.getNameSurname() + "\n" +
-                "ORG:" + attendee.getCompany() + "\n" +
-                "EMAIL:" + attendee.getLinkedin() + "\n" +
-                "END:VCARD";
+        StringBuilder vcard = new StringBuilder();
+        vcard.append("BEGIN:VCARD\n");
+        vcard.append("VERSION:3.0\n");
+        vcard.append("N:").append(attendee.getSurname()).append(";").append(attendee.getName()).append(";;;\n");
+        vcard.append("FN:").append(attendee.getNameSurname()).append("\n");
+        
+        if (attendee.getCompany() != null && !attendee.getCompany().trim().isEmpty()) {
+            vcard.append("ORG:").append(attendee.getCompany()).append("\n");
+        }
+        
+        // Add LinkedIn as URL if it's a LinkedIn handle/URL, otherwise treat as email
+        String linkedinField = attendee.getLinkedin();
+        if (linkedinField != null && !linkedinField.trim().isEmpty()) {
+            String normalized = LinkedInNormalizer.normalizeToQrPayload(linkedinField);
+            if (normalized.startsWith("http")) {
+                // It's a LinkedIn URL
+                vcard.append("URL:").append(normalized).append("\n");
+            } else {
+                // It's an email or other contact info
+                vcard.append("EMAIL:").append(linkedinField).append("\n");
+            }
+        }
+        
+        vcard.append("END:VCARD");
+        return vcard.toString();
     }
 
     private Image generateQRCodeImage(String data) throws WriterException, IOException, BadElementException {
@@ -475,7 +457,8 @@ public class BadgeService {
         if (attendee.getName() == null || attendee.getName().trim().isEmpty()) {
             throw new IllegalArgumentException("Name is required");
         }
-        if (LinkedInNormalizer.normalizeToQrPayload(attendee.getLinkedin()).isEmpty()) {
+        String linkedinField = attendee.getLinkedin();
+        if (linkedinField == null || linkedinField.trim().isEmpty()) {
             throw new IllegalArgumentException("LinkedIn (or Email) is required");
         }
 
@@ -511,7 +494,8 @@ public class BadgeService {
         if (attendee.getName() == null || attendee.getName().trim().isEmpty()) {
             throw new IllegalArgumentException("Name is required");
         }
-        if (LinkedInNormalizer.normalizeToQrPayload(attendee.getLinkedin()).isEmpty()) {
+        String linkedinField = attendee.getLinkedin();
+        if (linkedinField == null || linkedinField.trim().isEmpty()) {
             throw new IllegalArgumentException("LinkedIn (or Email) is required");
         }
 
