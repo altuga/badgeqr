@@ -281,31 +281,31 @@ public class BadgeService {
 
         int nameSize;
         int nameLen = nameSurname.length();
-        // 80x50 has limited width; prefer smaller sizes early to avoid clipping.
+        // Larger title size to match screenshot; still downscale for long names.
         if (nameLen > 34) {
-            nameSize = 10;
-        } else if (nameLen > 28) {
-            nameSize = 11;
-        } else if (nameLen > 22) {
-            nameSize = 12;
-        } else if (nameLen > 18) {
             nameSize = 14;
-        } else if (nameLen > 14) {
-            nameSize = 15;
-        } else {
+        } else if (nameLen > 28) {
             nameSize = 16;
+        } else if (nameLen > 22) {
+            nameSize = 18;
+        } else if (nameLen > 18) {
+            nameSize = 20;
+        } else if (nameLen > 14) {
+            nameSize = 22;
+        } else {
+            nameSize = 24;
         }
 
         int companySize;
         int companyLen = company.length();
         if (companyLen > 34) {
-            companySize = 8;
-        } else if (companyLen > 26) {
-            companySize = 9;
-        } else if (companyLen > 18) {
-            companySize = 10;
-        } else {
             companySize = 11;
+        } else if (companyLen > 26) {
+            companySize = 12;
+        } else if (companyLen > 18) {
+            companySize = 14;
+        } else {
+            companySize = 16;
         }
 
         Font labelNameFont = new Font(baseFont, nameSize, Font.BOLD);
@@ -328,55 +328,35 @@ public class BadgeService {
         topSpacer.setPadding(0f);
         root.addCell(topSpacer);
 
-        // Body: name + company on left, QR code on right (no header)
-        PdfPTable body = new PdfPTable(2);
+        // Body: single-column layout to match screenshot (name, company, QR)
+        PdfPTable body = new PdfPTable(1);
         body.setWidthPercentage(100);
-        body.setWidths(new float[]{62f, 38f});
 
-        // Left side: name + company
-        PdfPCell leftCell = new PdfPCell();
-        leftCell.setBorder(Rectangle.NO_BORDER);
-        leftCell.setPadding(0f);
-        leftCell.setFixedHeight(bodyHeight);
-
-        PdfPTable leftInner = new PdfPTable(1);
-        // Keep text left-aligned, but visually center the whole text block.
-        leftInner.setWidthPercentage(94f);
-        leftInner.setHorizontalAlignment(Element.ALIGN_CENTER);
+        float nameHeight = bodyHeight * 0.38f;
+        float companyHeight = bodyHeight * 0.22f;
+        float qrHeight = bodyHeight * 0.40f;
 
         PdfPCell nameCell = new PdfPCell(new Phrase(nameSurname, labelNameFont));
         nameCell.setBorder(Rectangle.NO_BORDER);
-        nameCell.setHorizontalAlignment(Element.ALIGN_LEFT);
+        nameCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         nameCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        nameCell.setPaddingTop(5f);
+        nameCell.setPaddingTop(6f);
         nameCell.setPaddingLeft(6f);
         nameCell.setPaddingRight(6f);
-        nameCell.setFixedHeight(bodyHeight * 0.60f);
+        nameCell.setFixedHeight(nameHeight);
         nameCell.setNoWrap(false);
 
         PdfPCell companyCell = new PdfPCell(new Phrase(company, labelCompanyFont));
         companyCell.setBorder(Rectangle.NO_BORDER);
-        companyCell.setHorizontalAlignment(Element.ALIGN_LEFT);
+        companyCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         companyCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        companyCell.setPaddingBottom(5f);
+        companyCell.setPaddingBottom(4f);
         companyCell.setPaddingLeft(6f);
         companyCell.setPaddingRight(6f);
-        companyCell.setFixedHeight(bodyHeight * 0.40f);
+        companyCell.setFixedHeight(companyHeight);
         companyCell.setNoWrap(false);
 
-        leftInner.addCell(nameCell);
-        leftInner.addCell(companyCell);
-        leftCell.addElement(leftInner);
-
-        // Right side: QR code
-        PdfPCell rightCell = new PdfPCell();
-        rightCell.setBorder(Rectangle.NO_BORDER);
-        rightCell.setPadding(0f);
-        rightCell.setFixedHeight(bodyHeight);
-
-        float rightWidth = contentWidth * 0.38f;
-        float qrTarget = Math.min(rightWidth, bodyHeight);
-
+        float qrTarget = Math.min(contentWidth, qrHeight);
         String qrPayload = generateVCard(attendee);
         Image qrImage = generateQRCodeImage(qrPayload);
         qrImage.scaleToFit(qrTarget, qrTarget);
@@ -385,17 +365,13 @@ public class BadgeService {
         qrCell.setBorder(Rectangle.NO_BORDER);
         qrCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         qrCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        qrCell.setFixedHeight(bodyHeight);
+        qrCell.setFixedHeight(qrHeight);
         qrCell.setPaddingTop(2f);
         qrCell.setPaddingBottom(2f);
 
-        PdfPTable rightInner = new PdfPTable(1);
-        rightInner.setWidthPercentage(100);
-        rightInner.addCell(qrCell);
-        rightCell.addElement(rightInner);
-
-        body.addCell(leftCell);
-        body.addCell(rightCell);
+        body.addCell(nameCell);
+        body.addCell(companyCell);
+        body.addCell(qrCell);
 
         PdfPCell bodyCell = new PdfPCell(body);
         bodyCell.setBorder(Rectangle.NO_BORDER);
