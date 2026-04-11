@@ -64,14 +64,22 @@ public class BadgeController {
 
     @PostMapping("/quick-generate")
     public String quickGenerateBadge(
-            @RequestParam("name") String name,
+            @RequestParam("name") String fullName,
             @RequestParam(value = "linkedin", required = false) String linkedin,
             @RequestParam(value = "email", required = false) String email,
             @RequestParam("company") String company,
             RedirectAttributes redirectAttributes) {
         try {
+            // Split full name into name and surname
+            System.out.println("[DEBUG Badge] Full name received: '" + fullName + "'");
+            String[] nameParts = fullName.trim().split(" ", 2);
+            String name = nameParts.length > 0 ? nameParts[0] : "";
+            String surname = nameParts.length > 1 ? nameParts[1] : "";
+            System.out.println("[DEBUG Badge] Split result - name: '" + name + "', surname: '" + surname + "'");
+            System.out.println("[DEBUG Badge] getNameSurname() will return: '" + (name + " " + surname) + "'");
+            
             String contact = (linkedin != null && !linkedin.trim().isEmpty()) ? linkedin : email;
-            Attendee attendee = new Attendee(name, "", contact, company);
+            Attendee attendee = new Attendee(name, surname, contact, company);
             byte[] pdfBytes = badgeService.generateSingleBadge(attendee);
             String fileId = UUID.randomUUID().toString();
             pdfCache.put(fileId, pdfBytes);
@@ -86,14 +94,22 @@ public class BadgeController {
 
     @PostMapping("/quick-generate-label")
     public String quickGenerateLabel(
-            @RequestParam("name") String name,
+            @RequestParam("name") String fullName,
             @RequestParam(value = "linkedin", required = false) String linkedin,
             @RequestParam(value = "email", required = false) String email,
             @RequestParam("company") String company,
             RedirectAttributes redirectAttributes) {
         try {
+            // Split full name into name and surname
+            System.out.println("[DEBUG Label] Full name received: '" + fullName + "'");
+            String[] nameParts = fullName.trim().split(" ", 2);
+            String name = nameParts.length > 0 ? nameParts[0] : "";
+            String surname = nameParts.length > 1 ? nameParts[1] : "";
+            System.out.println("[DEBUG Label] Split result - name: '" + name + "', surname: '" + surname + "'");
+            System.out.println("[DEBUG Label] getNameSurname() will return: '" + (name + " " + surname) + "'");
+            
             String contact = (linkedin != null && !linkedin.trim().isEmpty()) ? linkedin : email;
-            Attendee attendee = new Attendee(name, "", contact, company);
+            Attendee attendee = new Attendee(name, surname, contact, company);
             byte[] pdfBytes = badgeService.generateSingleLabel80x50(attendee);
             String fileId = UUID.randomUUID().toString();
             pdfCache.put(fileId, pdfBytes);

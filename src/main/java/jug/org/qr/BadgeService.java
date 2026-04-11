@@ -39,10 +39,11 @@ public class BadgeService {
 
     private static final float LABEL_WIDTH_MM = 80f;
     private static final float LABEL_HEIGHT_MM = 50f;
-    private static final float LABEL_MARGIN_PT = 6f;
+    private static final float LABEL_MARGIN_MM = 5f;  // 0.5 cm = 5mm on all sides
+    private static final float LABEL_MARGIN_PT = LABEL_MARGIN_MM * 72f / 25.4f; // 5mm = ~14pt
 
-    // Nudge the whole 80x50 label content slightly downward (in mm).
-    private static final float LABEL_TOP_SHIFT_MM = 3f;
+    // No vertical shift - content centered with equal margins on all sides
+    private static final float LABEL_TOP_SHIFT_MM = 0f;
 
     private File tempFontFile;
     private Font nameFont;
@@ -279,6 +280,10 @@ public class BadgeService {
         String nameSurname = attendee.getNameSurname() == null ? "" : attendee.getNameSurname().trim();
         String company = attendee.getCompany() == null ? "" : attendee.getCompany().trim();
 
+        System.out.println("[DEBUG PDF] Adding to PDF - nameSurname: '" + nameSurname + "' (length: " + nameSurname.length() + ")");
+        System.out.println("[DEBUG PDF] attendee.getName(): '" + attendee.getName() + "'");
+        System.out.println("[DEBUG PDF] attendee.getSurname(): '" + attendee.getSurname() + "'");
+
         int nameSize;
         int nameLen = nameSurname.length();
         // Larger title size to match screenshot; still downscale for long names.
@@ -289,9 +294,9 @@ public class BadgeService {
         } else if (nameLen > 22) {
             nameSize = 18;
         } else if (nameLen > 18) {
-            nameSize = 20;
+            nameSize = 18;  // Reduced from 20 to prevent wrapping
         } else if (nameLen > 14) {
-            nameSize = 22;
+            nameSize = 20;  // Swapped with above
         } else {
             nameSize = 24;
         }
@@ -315,44 +320,55 @@ public class BadgeService {
         float contentWidth = document.getPageSize().getWidth() - document.leftMargin() - document.rightMargin();
 
         float mmToPoints = 72f / 25.4f;
-        float topSpacerHeight = LABEL_TOP_SHIFT_MM * mmToPoints;
-        // No header - use all available space for content (name, company, QR code)
-        float bodyHeight = Math.max(0f, contentHeight - topSpacerHeight);
+        float shiftInPoints = LABEL_TOP_SHIFT_MM * mmToPoints;
+        
+        // Handle both positive (shift down) and negative (shift up) values
+        float topSpacerHeight = Math.max(0f, shiftInPoints);
+        float bodyHeight = contentHeight - topSpacerHeight;
+        
+        // For negative shifts, reduce body height from the top instead
+        if (shiftInPoints < 0) {
+            bodyHeight = contentHeight + shiftInPoints;
+        }
 
         PdfPTable root = new PdfPTable(1);
         root.setWidthPercentage(100);
 
-        PdfPCell topSpacer = new PdfPCell(new Phrase(""));
-        topSpacer.setBorder(Rectangle.NO_BORDER);
-        topSpacer.setFixedHeight(topSpacerHeight);
-        topSpacer.setPadding(0f);
-        root.addCell(topSpacer);
+        // Only add top spacer if shift is positive (moving content down)
+        if (topSpacerHeight > 0) {
+            PdfPCell topSpacer = new PdfPCell(new Phrase(""));
+            topSpacer.setBorder(Rectangle.NO_BORDER);
+            topSpacer.setFixedHeight(topSpacerHeight);
+            topSpacer.setPadding(0f);
+            root.addCell(topSpacer);
+        }
 
         // Body: single-column layout to match screenshot (name, company, QR)
         PdfPTable body = new PdfPTable(1);
         body.setWidthPercentage(100);
 
-        float nameHeight = bodyHeight * 0.38f;
-        float companyHeight = bodyHeight * 0.22f;
-        float qrHeight = bodyHeight * 0.40f;
+        // For very long names, allocate more space and allow wrapping
+        boolean allowWrapping = nameLen > 30;
+        float nameHeight = allowWrapping ? bodyHeight * 0.42f : bodyHeight * 0.38f;
+        float companyHeight = allowWrapping ? bodyHeight * 0.23f : bodyHeight * 0.22f;
+        float qrHeight = allowWrapping ? bodyHeight * 0.35f : bodyHeight * 0.40f;
 
+        //System.out.println("[DEBUG PDF] Creating name cell with text: '" + nameSurname + "'");
+        //System.out.println("[DEBUG PDF] Name font size: " + nameSize);
+        
         PdfPCell nameCell = new PdfPCell(new Phrase(nameSurname, labelNameFont));
         nameCell.setBorder(Rectangle.NO_BORDER);
         nameCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         nameCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        nameCell.setPaddingTop(6f);
-        nameCell.setPaddingLeft(6f);
-        nameCell.setPaddingRight(6f);
+        nameCell.setPadding(0f);
         nameCell.setFixedHeight(nameHeight);
-        nameCell.setNoWrap(false);
+        nameCell.setNoWrap(!allowWrapping);  // Allow wrapping for very long names
 
         PdfPCell companyCell = new PdfPCell(new Phrase(company, labelCompanyFont));
         companyCell.setBorder(Rectangle.NO_BORDER);
         companyCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         companyCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
-        companyCell.setPaddingBottom(4f);
-        companyCell.setPaddingLeft(6f);
-        companyCell.setPaddingRight(6f);
+        companyCell.setPadding(0f);
         companyCell.setFixedHeight(companyHeight);
         companyCell.setNoWrap(false);
 
@@ -366,8 +382,7 @@ public class BadgeService {
         qrCell.setHorizontalAlignment(Element.ALIGN_CENTER);
         qrCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
         qrCell.setFixedHeight(qrHeight);
-        qrCell.setPaddingTop(2f);
-        qrCell.setPaddingBottom(2f);
+        qrCell.setPadding(0f);
 
         body.addCell(nameCell);
         body.addCell(companyCell);
