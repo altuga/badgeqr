@@ -45,6 +45,9 @@ public class BadgeService {
     // No vertical shift - content centered with equal margins on all sides
     private static final float LABEL_TOP_SHIFT_MM = 0f;
 
+    // Empty space between the company text and the QR code so scanners don't pick up the text.
+    private static final float LABEL_QR_GAP_MM = 3f;
+
     private File tempFontFile;
     private Font nameFont;
     private Font companyFont;
@@ -313,11 +316,18 @@ public class BadgeService {
             companySize = 16;
         }
 
-        Font labelNameFont = new Font(baseFont, nameSize, Font.BOLD);
-        Font labelCompanyFont = new Font(baseFont, companySize);
-
         float contentHeight = document.getPageSize().getHeight() - document.topMargin() - document.bottomMargin();
         float contentWidth = document.getPageSize().getWidth() - document.leftMargin() - document.rightMargin();
+
+        // Keep the company on a single line so the QR gap fits; shrink long names to the label width.
+        float companyFontSize = companySize;
+        float companyWidth = baseFont.getWidthPoint(company, companyFontSize);
+        if (companyWidth > contentWidth) {
+            companyFontSize = Math.max(8f, companyFontSize * (contentWidth / companyWidth));
+        }
+
+        Font labelNameFont = new Font(baseFont, nameSize, Font.BOLD);
+        Font labelCompanyFont = new Font(baseFont, companyFontSize);
 
         float mmToPoints = 72f / 25.4f;
         float shiftInPoints = LABEL_TOP_SHIFT_MM * mmToPoints;
@@ -349,9 +359,13 @@ public class BadgeService {
 
         // For very long names, allocate more space and allow wrapping
         boolean allowWrapping = nameLen > 30;
-        float nameHeight = allowWrapping ? bodyHeight * 0.42f : bodyHeight * 0.38f;
-        float companyHeight = allowWrapping ? bodyHeight * 0.23f : bodyHeight * 0.22f;
         float qrHeight = allowWrapping ? bodyHeight * 0.35f : bodyHeight * 0.40f;
+        // The gap is taken from the text area, not the QR, so the QR keeps its size.
+        float qrGap = LABEL_QR_GAP_MM * mmToPoints;
+        float textHeight = bodyHeight - qrHeight - qrGap;
+        float nameShare = allowWrapping ? 0.42f / 0.65f : 0.38f / 0.60f;
+        float nameHeight = textHeight * nameShare;
+        float companyHeight = textHeight - nameHeight;
 
         //System.out.println("[DEBUG PDF] Creating name cell with text: '" + nameSurname + "'");
         //System.out.println("[DEBUG PDF] Name font size: " + nameSize);
@@ -384,8 +398,14 @@ public class BadgeService {
         qrCell.setFixedHeight(qrHeight);
         qrCell.setPadding(0f);
 
+        PdfPCell gapCell = new PdfPCell(new Phrase(""));
+        gapCell.setBorder(Rectangle.NO_BORDER);
+        gapCell.setPadding(0f);
+        gapCell.setFixedHeight(qrGap);
+
         body.addCell(nameCell);
         body.addCell(companyCell);
+        body.addCell(gapCell);
         body.addCell(qrCell);
 
         PdfPCell bodyCell = new PdfPCell(body);
