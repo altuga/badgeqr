@@ -8,6 +8,9 @@ import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+import com.google.zxing.qrcode.encoder.ByteMatrix;
+import com.google.zxing.qrcode.encoder.Encoder;
 import jakarta.annotation.PostConstruct;
 
 import javax.imageio.ImageIO;
@@ -16,6 +19,7 @@ import java.io.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -131,11 +135,11 @@ public class BadgeService {
         document.setMargins(LABEL_MARGIN_PT, LABEL_MARGIN_PT, LABEL_MARGIN_PT, LABEL_MARGIN_PT);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PdfWriter.getInstance(document, outputStream);
+        PdfWriter writer = PdfWriter.getInstance(document, outputStream);
         document.open();
 
         for (int i = 0; i < attendees.size(); i++) {
-            addLabel80x50ToDocument(document, attendees.get(i));
+            addLabel80x50ToDocument(document, writer, attendees.get(i));
             if (i < attendees.size() - 1) {
                 document.newPage();
             }
@@ -277,7 +281,7 @@ public class BadgeService {
         document.add(layout);
     }
 
-    private void addLabel80x50ToDocument(Document document, Attendee attendee) throws Exception {
+    private void addLabel80x50ToDocument(Document document, PdfWriter writer, Attendee attendee) throws Exception {
         BaseFont baseFont = nameFont.getBaseFont();
 
         String nameSurname = attendee.getNameSurname() == null ? "" : attendee.getNameSurname().trim();
@@ -307,13 +311,13 @@ public class BadgeService {
         int companySize;
         int companyLen = company.length();
         if (companyLen > 34) {
-            companySize = 11;
+            companySize = 10;
         } else if (companyLen > 26) {
-            companySize = 12;
+            companySize = 11;
         } else if (companyLen > 18) {
-            companySize = 14;
+            companySize = 12;
         } else {
-            companySize = 16;
+            companySize = 14;
         }
 
         float contentHeight = document.getPageSize().getHeight() - document.topMargin() - document.bottomMargin();
@@ -359,13 +363,18 @@ public class BadgeService {
 
         // For very long names, allocate more space and allow wrapping
         boolean allowWrapping = nameLen > 30;
-        float qrHeight = allowWrapping ? bodyHeight * 0.35f : bodyHeight * 0.40f;
+        // QR keeps the same share for long names too; a smaller QR is the first thing phones fail to read.
+        float qrHeight = bodyHeight * 0.40f;
         // The gap is taken from the text area, not the QR, so the QR keeps its size.
         float qrGap = LABEL_QR_GAP_MM * mmToPoints;
         float textHeight = bodyHeight - qrHeight - qrGap;
         float nameShare = allowWrapping ? 0.42f / 0.65f : 0.38f / 0.60f;
         float nameHeight = textHeight * nameShare;
         float companyHeight = textHeight - nameHeight;
+        // The company is a single line: size its row to that line and give the rest to the QR.
+        float companyLineHeight = Math.min(companyHeight, companyFontSize * 1.25f);
+        qrHeight += companyHeight - companyLineHeight;
+        companyHeight = companyLineHeight;
 
         //System.out.println("[DEBUG PDF] Creating name cell with text: '" + nameSurname + "'");
         //System.out.println("[DEBUG PDF] Name font size: " + nameSize);
@@ -385,11 +394,13 @@ public class BadgeService {
         companyCell.setPadding(0f);
         companyCell.setFixedHeight(companyHeight);
         companyCell.setNoWrap(false);
+        // Measure the line by the font's real ascender/descender so it fits the tight row.
+        companyCell.setUseAscender(true);
+        companyCell.setUseDescender(true);
 
         float qrTarget = Math.min(contentWidth, qrHeight);
         String qrPayload = generateVCard(attendee);
-        Image qrImage = generateQRCodeImage(qrPayload);
-        qrImage.scaleToFit(qrTarget, qrTarget);
+        Image qrImage = generateQRCodeVector(writer, qrPayload, qrTarget);
 
         PdfPCell qrCell = new PdfPCell(qrImage, true);
         qrCell.setBorder(Rectangle.NO_BORDER);
@@ -443,6 +454,40 @@ public class BadgeService {
         
         vcard.append("END:VCARD");
         return vcard.toString();
+    }
+
+    /**
+     * Draws the QR as vector squares filling {@code size} points, with no built-in quiet zone.
+     * Vector edges stay sharp at any printer resolution; the surrounding gap and margins act as the quiet zone.
+     */
+    private Image generateQRCodeVector(PdfWriter writer, String data, float size) throws WriterException, BadElementException {
+        Map<EncodeHintType, Object> hints = new EnumMap<>(EncodeHintType.class);
+        hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
+        ByteMatrix matrix = Encoder.encode(data, ErrorCorrectionLevel.L, hints).getMatrix();
+
+        int modules = matrix.getWidth();
+        float moduleSize = size / modules;
+        PdfTemplate template = PdfTemplate.createTemplate(writer, size, size);
+        template.setColorFill(BaseColor.BLACK);
+        for (int y = 0; y < modules; y++) {
+            int x = 0;
+            while (x < modules) {
+                if (matrix.get(x, y) != 1) {
+                    x++;
+                    continue;
+                }
+                // One rectangle per run of dark modules avoids hairline seams between neighbours.
+                int runStart = x;
+                while (x < modules && matrix.get(x, y) == 1) {
+                    x++;
+                }
+                // PDF y-axis points up, so row 0 goes at the top.
+                template.rectangle(runStart * moduleSize, size - (y + 1) * moduleSize,
+                        (x - runStart) * moduleSize, moduleSize);
+            }
+        }
+        template.fill();
+        return Image.getInstance(template);
     }
 
     private Image generateQRCodeImage(String data) throws WriterException, IOException, BadElementException {
@@ -517,10 +562,10 @@ public class BadgeService {
         document.setMargins(LABEL_MARGIN_PT, LABEL_MARGIN_PT, LABEL_MARGIN_PT, LABEL_MARGIN_PT);
 
         ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-        PdfWriter.getInstance(document, outputStream);
+        PdfWriter writer = PdfWriter.getInstance(document, outputStream);
         document.open();
 
-        addLabel80x50ToDocument(document, attendee);
+        addLabel80x50ToDocument(document, writer, attendee);
         document.close();
 
         byte[] pdfBytes = outputStream.toByteArray();
