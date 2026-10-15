@@ -43,14 +43,14 @@ public class BadgeService {
 
     private static final float LABEL_WIDTH_MM = 80f;
     private static final float LABEL_HEIGHT_MM = 50f;
-    private static final float LABEL_MARGIN_MM = 5f;  // 0.5 cm = 5mm on all sides
-    private static final float LABEL_MARGIN_PT = LABEL_MARGIN_MM * 72f / 25.4f; // 5mm = ~14pt
+    private static final float LABEL_MARGIN_MM = 3f;  // 3mm on all sides; leaves room for label printer drift
+    private static final float LABEL_MARGIN_PT = LABEL_MARGIN_MM * 72f / 25.4f; // 3mm = ~8.5pt
 
     // No vertical shift - content centered with equal margins on all sides
     private static final float LABEL_TOP_SHIFT_MM = 0f;
 
     // Empty space between the company text and the QR code so scanners don't pick up the text.
-    private static final float LABEL_QR_GAP_MM = 3f;
+    private static final float LABEL_QR_GAP_MM = 4f;
 
     private File tempFontFile;
     private Font nameFont;
@@ -361,42 +361,40 @@ public class BadgeService {
         PdfPTable body = new PdfPTable(1);
         body.setWidthPercentage(100);
 
-        // For very long names, allocate more space and allow wrapping
+        // For very long names, allow wrapping
         boolean allowWrapping = nameLen > 30;
-        // QR keeps the same share for long names too; a smaller QR is the first thing phones fail to read.
-        float qrHeight = bodyHeight * 0.40f;
-        // The gap is taken from the text area, not the QR, so the QR keeps its size.
-        float qrGap = LABEL_QR_GAP_MM * mmToPoints;
-        float textHeight = bodyHeight - qrHeight - qrGap;
-        float nameShare = allowWrapping ? 0.42f / 0.65f : 0.38f / 0.60f;
-        float nameHeight = textHeight * nameShare;
-        float companyHeight = textHeight - nameHeight;
-        // The company is a single line: size its row to that line and give the rest to the QR.
-        float companyLineHeight = Math.min(companyHeight, companyFontSize * 1.25f);
-        qrHeight += companyHeight - companyLineHeight;
-        companyHeight = companyLineHeight;
 
         //System.out.println("[DEBUG PDF] Creating name cell with text: '" + nameSurname + "'");
         //System.out.println("[DEBUG PDF] Name font size: " + nameSize);
-        
+
+        // Name and company sit at the top, each row sized to its text (by the font's real
+        // ascender/descender); everything below the gap goes to the QR.
         PdfPCell nameCell = new PdfPCell(new Phrase(nameSurname, labelNameFont));
         nameCell.setBorder(Rectangle.NO_BORDER);
         nameCell.setHorizontalAlignment(Element.ALIGN_CENTER);
-        nameCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        nameCell.setVerticalAlignment(Element.ALIGN_TOP);
         nameCell.setPadding(0f);
-        nameCell.setFixedHeight(nameHeight);
         nameCell.setNoWrap(!allowWrapping);  // Allow wrapping for very long names
+        nameCell.setUseAscender(true);
+        nameCell.setUseDescender(true);
+        float nameHeight = measureCellHeight(nameCell, contentWidth);
+        nameCell.setFixedHeight(nameHeight);
 
         PdfPCell companyCell = new PdfPCell(new Phrase(company, labelCompanyFont));
         companyCell.setBorder(Rectangle.NO_BORDER);
         companyCell.setHorizontalAlignment(Element.ALIGN_CENTER);
-        companyCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        companyCell.setVerticalAlignment(Element.ALIGN_TOP);
         companyCell.setPadding(0f);
-        companyCell.setFixedHeight(companyHeight);
+        companyCell.setPaddingTop(2f);  // small breathing room under the name
         companyCell.setNoWrap(false);
-        // Measure the line by the font's real ascender/descender so it fits the tight row.
         companyCell.setUseAscender(true);
         companyCell.setUseDescender(true);
+        float companyHeight = measureCellHeight(companyCell, contentWidth);
+        companyCell.setFixedHeight(companyHeight);
+
+        float qrGap = LABEL_QR_GAP_MM * mmToPoints;
+        // 1pt slack so rounding never pushes the body past the page.
+        float qrHeight = bodyHeight - nameHeight - companyHeight - qrGap - 1f;
 
         float qrTarget = Math.min(contentWidth, qrHeight);
         String qrPayload = generateVCard(attendee);
@@ -454,6 +452,15 @@ public class BadgeService {
         
         vcard.append("END:VCARD");
         return vcard.toString();
+    }
+
+    /** Natural height of a cell laid out at the given width. */
+    private static float measureCellHeight(PdfPCell cell, float width) {
+        PdfPTable probe = new PdfPTable(1);
+        probe.setTotalWidth(width);
+        probe.setLockedWidth(true);
+        probe.addCell(cell);
+        return probe.getRowHeight(0);
     }
 
     /**
